@@ -1197,9 +1197,41 @@ function initializeMap(data) {
 
     // 7. Rozbalovací legenda
     document.querySelectorAll('.legend-group-header').forEach(header => {
-        header.addEventListener('click', () => {
-            header.classList.toggle('open');
-            const items = header.nextElementSibling;
+        header.addEventListener('click', (e) => {
+            // Cíl kliknutí
+            const target = e.currentTarget;
+            const groupName = target.dataset.toggleGroup; // např. "SMA"
+
+            // --- NOVÁ LOGIKA PRO PŘEPÍNÁNÍ SKUPIN ---
+            if (groupName) {
+                // 1. Najdi všechny položky v legendě, které patří do této skupiny
+                const itemsToToggle = document.querySelectorAll(`.legend-item[data-layer-name*="${groupName}"]`);
+                
+                if (itemsToToggle.length > 0) {
+                    // 2. Zjisti, jestli budeme zapínat nebo vypínat (podle první položky)
+                    const shouldEnable = itemsToToggle[0].classList.contains('disabled');
+
+                    itemsToToggle.forEach(item => {
+                        const layerName = item.dataset.layerName;
+                        if (!layers[layerName]) return;
+
+                        if (shouldEnable) {
+                            // Zapnout
+                            map.addLayer(layers[layerName]);
+                            item.classList.remove('disabled');
+                        } else {
+                            // Vypnout
+                            map.removeLayer(layers[layerName]);
+                            item.classList.add('disabled');
+                        }
+                    });
+                }
+            }
+            // --- KONEC NOVÉ LOGIKY ---
+
+            // Původní logika pro rozbalení/sbalení
+            target.classList.toggle('open');
+            const items = target.nextElementSibling;
             if (items.style.display === "block") {
                 items.style.display = "none";
             } else {
