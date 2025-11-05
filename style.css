@@ -1,0 +1,287 @@
+/* Základní styly pro celou stránku */
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    font-family: sans-serif;
+    background-color: #1a1a1a; /* Tmavé pozadí stránky */
+}
+
+/* Styl pro kontejner mapy, aby vyplnil celou obrazovku */
+#map {
+    height: 100%;
+    width: 100%;
+}
+
+/* --- Nový styl pro Loader --- */
+#loader {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(26, 26, 26, 0.95);
+    z-index: 20000;
+    display: flex; /* Použijeme flex pro centrování */
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    color: #f0f0f0;
+}
+.loader-spinner {
+    border: 8px solid #f3f3f3;
+    border-top: 8px solid #3498db;
+    border-radius: 50%;
+    width: 60px;
+    height: 60px;
+    animation: spin 1.5s linear infinite;
+}
+#loader p {
+    margin-top: 20px;
+    font-size: 16px;
+}
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+/* --- Konec stylu pro Loader --- */
+
+
+/* Styl pro informační box v rohu mapy */
+.info-box {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background-color: rgba(26, 26, 26, 0.85);
+    color: #f0f0f0;
+    padding: 10px 15px;
+    border-radius: 8px;
+    border: 1px solid #444;
+    z-index: 1000; /* Zajistí, že bude nad mapou */
+    font-size: 14px;
+    max-width: 250px;
+    max-height: 90vh; /* Omezení výšky */
+    overflow-y: auto; /* Přidání rolování */
+}
+.info-box h3 {
+    display: block;
+    margin-bottom: 8px;
+    margin-top: 0; /* Reset */
+}
+.legend-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 4px;
+    cursor: pointer; /* Ukazuje, že je prvek klikatelný */
+    transition: opacity 0.2s;
+}
+/* Styl pro vypnutou vrstvu v legendě */
+.legend-item.disabled {
+    opacity: 0.6;
+    text-decoration: line-through;
+}
+.legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 8px;
+    border: 1px solid #fff;
+}
+.legend-square {
+    width: 12px;
+    height: 12px;
+    margin-right: 8px;
+    border: 1px solid #fff;
+}
+
+/* --- Nové styly pro seskupenou legendu --- */
+.legend-group-header {
+    cursor: pointer;
+    font-weight: bold;
+    padding: 4px 0;
+    position: relative;
+    padding-left: 15px; /* Místo pro šipku */
+    user-select: none; /* Zamezení výběru textu */
+}
+.legend-group-header::before {
+    content: '▶';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 10px;
+    transition: transform 0.2s;
+}
+.legend-group-header.open::before {
+    transform: translateY(-50%) rotate(90deg);
+}
+.legend-group-items {
+    padding-left: 10px;
+    display: none; /* Skryté ve výchozím stavu */
+}
+
+/* Styl pro trvale zobrazené popisky bodů (a SMA) */
+.point-label {
+    background-color: transparent;
+    border: none;
+    box-shadow: none;
+    color: #f0f0f0;
+    font-weight: bold;
+    font-size: 12px;
+    text-shadow: 1px 1px 2px #000, -1px -1px 2px #000, 1px -1px 2px #000, -1px 1px 2px #000;
+}
+/* SMA labely (trochu jiná barva pro odlišení) */
+.sma-label {
+    background-color: transparent;
+    border: none;
+    box-shadow: none;
+    color: #ff9f43; /* Oranžová jako obrys */
+    font-weight: bold;
+    font-size: 12px;
+    text-shadow: 1px 1px 2px #000, -1px -1px 2px #000, 1px -1px 2px #000, -1px 1px 2px #000;
+}
+
+
+/* --- Styly pro nový panel s vertikálním profilem --- */
+#profile-view {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    width: 300px;
+    background-color: rgba(26, 26, 26, 0.9);
+    color: #f0f0f0;
+    border-radius: 8px;
+    border: 1px solid #444;
+    z-index: 1000;
+    font-size: 12px;
+    display: none; /* Skryté ve výchozím stavu */
+    flex-direction: column;
+    transition: width 0.3s;
+}
+.profile-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    border-bottom: 1px solid #444;
+    background-color: rgba(40, 40, 40, 0.9);
+    border-radius: 8px 8px 0 0;
+}
+.profile-header strong {
+    font-size: 14px;
+}
+.profile-close {
+    cursor: pointer;
+    font-size: 20px;
+    line-height: 1;
+    padding: 0 5px;
+}
+.profile-content {
+    padding: 10px;
+    display: flex;
+    height: 500px; /* Celková výška profilu */
+    position: relative;
+}
+.profile-scale {
+    width: 50px;
+    position: relative;
+    flex-shrink: 0;
+}
+.scale-tick {
+    position: absolute;
+    width: 100%;
+    height: 1px;
+    right: 0;
+}
+.scale-tick > span {
+    position: absolute;
+    right: 18px;
+    bottom: 2px;
+    font-size: 10px;
+    color: #aaa;
+    white-space: nowrap;
+}
+.scale-tick::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 15px;
+    height: 1px;
+    background-color: #555;
+}
+.profile-airspaces {
+    flex-grow: 1;
+    position: relative;
+    display: flex;
+    border-left: 1px solid #555;
+}
+.profile-column {
+    flex: 1;
+    position: relative;
+    border-right: 1px solid #444;
+}
+.profile-column:last-child {
+    border-right: none;
+}
+.profile-column.center-column {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+.airspace-block {
+    position: absolute;
+    width: 100%;
+    left: 0;
+    border-radius: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 2px 0;
+    overflow: hidden;
+    box-sizing: border-box;
+    border: 1px solid;
+    border-left: none;
+    border-right: none;
+}
+.airspace-block span {
+    display: block;
+    text-align: center;
+    font-weight: bold;
+    text-shadow: 1px 1px 1px #000;
+}
+
+/* Nová čára pro SMA */
+.profile-sma-line {
+    position: absolute;
+    width: 100%;
+    left: 0;
+    border-top: 2px dashed #ff9f43;
+    box-sizing: border-box;
+    pointer-events: none;
+}
+.profile-sma-line span {
+    position: absolute;
+    right: -5px;
+    top: -8px;
+    transform: translateX(100%);
+    background: #1a1a1a;
+    padding: 0 3px;
+    font-size: 10px;
+    color: #ff9f43;
+    white-space: nowrap;
+}
+
+#coords-display {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    background-color: rgba(26, 26, 26, 0.85);
+    color: #f0f0f0;
+    padding: 5px 10px;
+    border-radius: 8px;
+    border: 1px solid #444;
+    z-index: 1000;
+    font-size: 14px;
+    font-family: monospace;
+    display: none; /* Initially hidden */
+}
