@@ -645,7 +645,6 @@ function parseDmsWithSymbols(coordString) {
         // Rozdělí podle symbolů
         const dmsParts = cleanPart.split(/[°'"]+/); // Rozdělí podle °, ' nebo "
         
-        // *** OPRAVA 1: Zde byla chyba ***
         // Musíme mít alespoň stupně a minuty
         if (dmsParts.length < 2) {
              console.warn(`parseDmsWithSymbols: Neúplné DMS části: ${part}`);
@@ -654,12 +653,15 @@ function parseDmsWithSymbols(coordString) {
         
         const degrees = parseFloat(dmsParts[0]);
         const minutes = parseFloat(dmsParts[1]);
-        // Pokud sekundy chybí (např. "48°37'"), dmsParts[2] bude ""
-        // parseFloat("") je NaN, což způsobilo chybu.
-        const seconds = (dmsParts.length > 2 && dmsParts[2]) ? parseFloat(dmsParts[2]) : 0.0;
+        
+        // *** TOTO JE OPRAVA ***
+        // Ošetření chybějících sekund: dmsParts[2] může být "" nebo undefined
+        // parseFloat("" || "0.0") => parseFloat("0.0") => 0.0
+        // parseFloat("03.25" || "0.0") => parseFloat("03.25") => 3.25
+        const seconds = parseFloat(dmsParts[2] || "0.0");
         
         if (isNaN(degrees) || isNaN(minutes) || isNaN(seconds)) {
-            console.warn(`parseDmsWithSymbols: Chyba při parsování čísel: ${part}`);
+            console.warn(`parseDmsWithSymbols: Chyba při parsování čísel: ${part} (Stupně: ${degrees}, Minuty: ${minutes}, Sekundy: ${seconds})`);
             return null; // Vrátíme null, ne [NaN, NaN]
         }
         
