@@ -150,7 +150,7 @@ function initializeMap(data) {
                 
                 // Zpracování bodů (pro kreslení bodů a přípravu tratě)
                 star.waypoints.forEach(wp => {
-                    // *** OPRAVA 2: Přidána kontrola, zda souřadnice byly úspěšně naparsovány ***
+                    // *** OPRAVA: Přidána kontrola, zda souřadnice byly úspěšně naparsovány ***
                     const coords = parseDmsWithSymbols(wp.coords);
                     if (coords) { // <-- TATO KONTROLA ZABRÁNÍ PÁDU
                         const marker = L.circleMarker(coords, {
@@ -465,7 +465,7 @@ function initializeProfileView() {
                 const candidates = allProfileAirspaces.filter(s => midPoint >= s.lower && midPoint < s.upper);
                 if (candidates.length > 0) {
                     const winner = candidates.reduce((prev, curr) => {
-                        // *** OPRAVA 3: Přidána kontrola, zda `staticDataStore` a priority existují ***
+                        // *** OPRAVA: Přidána kontrola, zda `staticDataStore` a priority existují ***
                         const priorityList = (staticDataStore && staticDataStore.classPriority) ? staticDataStore.classPriority : {};
                         const gliderList = (staticDataStore && staticDataStore.gliderAirspaces) ? staticDataStore.gliderAirspaces : [];
                         const traList = (staticDataStore && staticDataStore.traSpaces) ? staticDataStore.traSpaces : [];
@@ -635,8 +635,15 @@ function parseDmsWithSymbols(coordString) {
     // Rozdělí na lat a lng část
     const parts = coordString.split(/\s+/);
     if (parts.length < 2) {
-        console.warn(`parseDmsWithSymbols: Nelze rozdělit řetězec: ${coordString}`);
-        return null;
+        // Zkusíme, jestli to není jeden řetězec, který se dá rozdělit podle 'N'
+        const splitN = coordString.split('N');
+        if (splitN.length === 2) {
+            parts[0] = splitN[0] + 'N';
+            parts[1] = splitN[1];
+        } else {
+            console.warn(`parseDmsWithSymbols: Nelze rozdělit řetězec: ${coordString}`);
+            return null;
+        }
     }
 
     const parsePart = (part) => {
@@ -646,22 +653,18 @@ function parseDmsWithSymbols(coordString) {
         const dmsParts = cleanPart.split(/[°'"]+/); // Rozdělí podle °, ' nebo "
         
         // Musíme mít alespoň stupně a minuty
-        if (dmsParts.length < 2) {
+        if (dmsParts.length < 2) { // 48°37' -> ["48", "37", ""]
              console.warn(`parseDmsWithSymbols: Neúplné DMS části: ${part}`);
              return null;
         }
         
         const degrees = parseFloat(dmsParts[0]);
         const minutes = parseFloat(dmsParts[1]);
-        
-        // *** TOTO JE OPRAVA ***
-        // Ošetření chybějících sekund: dmsParts[2] může být "" nebo undefined
-        // parseFloat("" || "0.0") => parseFloat("0.0") => 0.0
-        // parseFloat("03.25" || "0.0") => parseFloat("03.25") => 3.25
-        const seconds = parseFloat(dmsParts[2] || "0.0");
+        // Pokud sekundy chybí (např. "48°37'"), dmsParts[2] bude "" nebo undefined
+        const seconds = (dmsParts.length > 2 && dmsParts[2]) ? parseFloat(dmsParts[2]) : 0.0;
         
         if (isNaN(degrees) || isNaN(minutes) || isNaN(seconds)) {
-            console.warn(`parseDmsWithSymbols: Chyba při parsování čísel: ${part} (Stupně: ${degrees}, Minuty: ${minutes}, Sekundy: ${seconds})`);
+            console.warn(`parseDmsWithSymbols: Chyba při parsování čísel: ${part} -> ${dmsParts}`);
             return null; // Vrátíme null, ne [NaN, NaN]
         }
         
