@@ -24,7 +24,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }).addTo(map);
 
     // Všechny data a logika mapy jsou nyní závislé na `staticDataStore`
-    initializeMap(staticDataStore);
+    // Přidána kontrola, zda staticDataStore existuje (načetl se)
+    if (typeof staticDataStore !== 'undefined') {
+        initializeMap(staticDataStore);
+    } else {
+        console.error("Hlavní datový soubor (data.js) se nepodařilo načíst!");
+        document.getElementById('loader').innerHTML = "<p>Chyba: Nepodařilo se načíst data mapy.</p>";
+    }
+
 
     // Skrytí loaderu po inicializaci
     document.getElementById('loader').style.display = 'none';
@@ -139,14 +146,13 @@ function initializeMap(data) {
             const starTrackLayer = L.layerGroup();
             let trackPoints = []; // Pro kreslení lomené čáry
 
-            // --- OPRAVA ZDE ---
-            // Přidána kontrola, zda star.waypoints existuje, než se na něj pokusíme volat .forEach
             if (star.waypoints && Array.isArray(star.waypoints)) {
                 
                 // Zpracování bodů (pro kreslení bodů a přípravu tratě)
                 star.waypoints.forEach(wp => {
+                    // *** OPRAVA 2: Přidána kontrola, zda souřadnice byly úspěšně naparsovány ***
                     const coords = parseDmsWithSymbols(wp.coords);
-                    if (coords) {
+                    if (coords) { // <-- TATO KONTROLA ZABRÁNÍ PÁDU
                         const marker = L.circleMarker(coords, {
                             radius: 5,
                             color: '#ffffff',
@@ -159,81 +165,80 @@ function initializeMap(data) {
                         
                         // Přidáme bod do pole pro kreslení tratě, včetně info o zatáčce
                         trackPoints.push({ coords: coords, turn: wp.turn, id: wp.id });
+                    } else {
+                        // Pokud parsování selže, vypíšeme varování a bod přeskočíme
+                        console.warn(`Chybné souřadnice pro bod ${wp.id} (${wp.coords}), bude přeskočen.`);
                     }
                 });
-
+                
                 // Kreslení tratě (s podporou Fly-by oblouků)
-                // ... (zde je kód pro kreslení oblouků, který jsem přidal minule) ...
-                
-                // Nejjednodušší řešení: Znovu projdeme a kreslíme
                 starTrackLayer.clearLayers();
-                let lastValidPoint = trackPoints[0].coords; // Začátek
                 
-                for (let i = 1; i < trackPoints.length; i++) {
-                    const pPrev = trackPoints[i-1];
-                    const pCurr = trackPoints[i];
+                // Zkontrolujeme, zda máme vůbec nějaké body k kreslení
+                if (trackPoints.length > 0) {
+                    let lastValidPoint = trackPoints[0].coords; // Začátek
                     
-                    // Je PŘEDCHOZÍ bod (pPrev) bodem zatáčky?
-                    // *** Chyba byla zde: pPrev.turn neexistovalo, bylo to pCurr.turn (bod *ke kterému* letíme, má zatáčku)
-                    // *** A musíme kontrolovat pPrev (i-1) a pCurr(i) a pNext(i+1)
-                    
-                    const pNext = (i < trackPoints.length - 1) ? trackPoints[i+1] : null;
+                    for (let i = 1; i < trackPoints.length; i++) {
+                        const pPrev = trackPoints[i-1];
+                        const pCurr = trackPoints[i];
+                        const pNext = (i < trackPoints.length - 1) ? trackPoints[i+1] : null;
 
-                    // Je AKTUÁLNÍ bod (pCurr) bodem zatáčky (fly-by)?
-                    if (pCurr.turn && pNext && L.curve) {
-                        
-                        const latLngPrev = L.latLng(pPrev.coords);
-                        const latLngCurr = L.latLng(pCurr.coords);
-                        const latLngNext = L.latLng(pNext.coords);
-                        
-                        // Směry
-                        const bearingIn = latLngPrev.bearingTo(latLngCurr);
-                        const bearingOut = latLngCurr.bearingTo(latLngNext);
+                        // Je AKTUÁLNÍ bod (pCurr) bodem zatáčky (fly-by)?
+                        if (pCurr.turn && pNext && L.curve) {
+                            
+                            const latLngPrev = L.latLng(pPrev.coords);
+                            const latLngCurr = L.latLng(pCurr.coords);
+                            const latLngNext = L.latLng(pNext.coords);
+                            
+                            // Směry
+                            const bearingIn = latLngPrev.bearingTo(latLngCurr);
+                            const bearingOut = latLngCurr.bearingTo(latLngNext);
 
-                        // Poloměr "odříznutí" rohu
-                        const turnRadiusMeters = 1852 * 1.5; // 1.5 NM
+                            // Poloměr "odříznutí" rohu
+                            const turnRadiusMeters = 1852 * 1.5; // 1.5 NM
 
-                        // Bod, kde oblouk začíná (na trati P1 -> P2)
-                        const curveStart = latLngCurr.destination(bearingIn + 180, turnRadiusMeters);
-                        // Bod, kde oblouk končí (na trati P2 -> P3)
-                        const curveEnd = latLngCurr.destination(bearingOut, turnRadiusMeters);
-                        
-                        // 1. Čára od 'lastValidPoint' (konec minulé čáry) k začátku oblouku
-                        starTrackLayer.addLayer(L.polyline([lastValidPoint, curveStart], { 
-                            color: star.color, weight: 3, opacity: 0.8 
-                        }));
-                        
-                        // 2. Oblouk (Bézierova křivka)
-                        starTrackLayer.addLayer(L.curve(
-                            ['M', curveStart, 'Q', latLngCurr, curveEnd],
-                            { color: star.color, weight: 3, opacity: 0.8, dashArray: '5, 5' }
-                        ));
-                        
-                        // Aktualizujeme 'lastValidPoint' na konec oblouku
-                        lastValidPoint = curveEnd;
-                        
-                        // Důležité: Přeskočíme další bod (pNext), protože jsme ho právě použili
-                        i++; 
-                        
-                        // Pokud byl přeskočený bod poslední, musíme dokreslit čáru k němu
-                        if (i === trackPoints.length - 1) {
-                             starTrackLayer.addLayer(L.polyline([lastValidPoint, trackPoints[i].coords], { 
+                            // Bod, kde oblouk začíná (na trati P1 -> P2)
+                            const curveStart = latLngCurr.destination(bearingIn + 180, turnRadiusMeters);
+                            // Bod, kde oblouk končí (na trati P2 -> P3)
+                            const curveEnd = latLngCurr.destination(bearingOut, turnRadiusMeters);
+                            
+                            // 1. Čára od 'lastValidPoint' (konec minulé čáry) k začátku oblouku
+                            starTrackLayer.addLayer(L.polyline([lastValidPoint, curveStart], { 
                                 color: star.color, weight: 3, opacity: 0.8 
                             }));
-                        } else {
-                            // Pokud není poslední, musíme 'i' vrátit o 1 zpět,
-                            // aby se 'pNext' stalo 'pPrev' v další iteraci
-                            i--;
-                        }
+                            
+                            // 2. Oblouk (Bézierova křivka)
+                            starTrackLayer.addLayer(L.curve(
+                                ['M', curveStart, 'Q', latLngCurr, curveEnd],
+                                { color: star.color, weight: 3, opacity: 0.8, dashArray: '5, 5' }
+                            ));
+                            
+                            // Aktualizujeme 'lastValidPoint' na konec oblouku
+                            lastValidPoint = curveEnd;
+                            
+                            // Důležité: Přeskočíme další bod (pNext), protože jsme ho právě použili
+                            i++; 
+                            
+                            // Pokud byl přeskočený bod poslední, musíme dokreslit čáru k němu
+                            if (i === trackPoints.length - 1) {
+                                starTrackLayer.addLayer(L.polyline([lastValidPoint, trackPoints[i].coords], { 
+                                    color: star.color, weight: 3, opacity: 0.8 
+                                }));
+                            } else {
+                                // Pokud není poslední, musíme 'i' vrátit o 1 zpět,
+                                // aby se 'pNext' stalo 'pPrev' v další iteraci
+                                i--;
+                            }
 
-                    } else {
-                        // Normální přímá čára
-                        starTrackLayer.addLayer(L.polyline([lastValidPoint, pCurr.coords], { 
-                            color: star.color, weight: 3, opacity: 0.8 
-                        }));
-                        lastValidPoint = pCurr.coords;
+                        } else {
+                            // Normální přímá čára
+                            starTrackLayer.addLayer(L.polyline([lastValidPoint, pCurr.coords], { 
+                                color: star.color, weight: 3, opacity: 0.8 
+                            }));
+                            lastValidPoint = pCurr.coords;
+                        }
                     }
-                }
+                } // konec if (trackPoints.length > 0)
 
             } else {
                 console.warn(`Data pro STAR '${star.name}' se zdají být nekompletní nebo chybí 'waypoints'. Zkontrolujte rnav_data.js.`);
@@ -460,19 +465,21 @@ function initializeProfileView() {
                 const candidates = allProfileAirspaces.filter(s => midPoint >= s.lower && midPoint < s.upper);
                 if (candidates.length > 0) {
                     const winner = candidates.reduce((prev, curr) => {
-                        // Načtení priorit z `staticDataStore`
-                        let prevPriority = staticDataStore.classPriority[prev.name] || staticDataStore.classPriority[prev.type] || staticDataStore.classPriority[prev.class] || 0;
-                        let currPriority = staticDataStore.classPriority[curr.name] || staticDataStore.classPriority[curr.type] || staticDataStore.classPriority[curr.class] || 0;
+                        // *** OPRAVA 3: Přidána kontrola, zda `staticDataStore` a priority existují ***
+                        const priorityList = (staticDataStore && staticDataStore.classPriority) ? staticDataStore.classPriority : {};
+                        const gliderList = (staticDataStore && staticDataStore.gliderAirspaces) ? staticDataStore.gliderAirspaces : [];
+                        const traList = (staticDataStore && staticDataStore.traSpaces) ? staticDataStore.traSpaces : [];
+
+                        let prevPriority = priorityList[prev.name] || priorityList[prev.type] || priorityList[prev.class] || 0;
+                        let currPriority = priorityList[curr.name] || priorityList[curr.type] || priorityList[curr.class] || 0;
                         
-                        if (prev.class === 'TMA4') prevPriority = staticDataStore.classPriority['TMA4'];
-                        if (curr.class === 'TMA4') currPriority = staticDataStore.classPriority['TMA4'];
+                        if (prev.class === 'TMA4') prevPriority = priorityList['TMA4'];
+                        if (curr.class === 'TMA4') currPriority = priorityList['TMA4'];
                         
-                        // Zde byla chyba, `gliderAirspaces` a `traSpaces` nebyly definovány
-                        // Musíme je načíst z `staticDataStore`
-                        if (staticDataStore.gliderAirspaces.includes(prev.name)) prevPriority = staticDataStore.classPriority['Glider'];
-                        if (staticDataStore.gliderAirspaces.includes(curr.name)) currPriority = staticDataStore.classPriority['Glider'];
-                        if (staticDataStore.traSpaces.includes(prev.name)) prevPriority = staticDataStore.classPriority['TRA'];
-                        if (staticDataStore.traSpaces.includes(curr.name)) currPriority = staticDataStore.classPriority['TRA'];
+                        if (gliderList.includes(prev.name)) prevPriority = priorityList['Glider'];
+                        if (gliderList.includes(curr.name)) currPriority = priorityList['Glider'];
+                        if (traList.includes(prev.name)) prevPriority = priorityList['TRA'];
+                        if (traList.includes(curr.name)) currPriority = priorityList['TRA'];
 
                         return currPriority > prevPriority ? curr : prev;
                     });
@@ -637,18 +644,23 @@ function parseDmsWithSymbols(coordString) {
         const cleanPart = part.replace(/[NESW]/i, '').replace(',', '.');
         // Rozdělí podle symbolů
         const dmsParts = cleanPart.split(/[°'"]+/); // Rozdělí podle °, ' nebo "
-        if (dmsParts.length < 3) {
+        
+        // *** OPRAVA 1: Zde byla chyba ***
+        // Musíme mít alespoň stupně a minuty
+        if (dmsParts.length < 2) {
              console.warn(`parseDmsWithSymbols: Neúplné DMS části: ${part}`);
              return null;
         }
         
         const degrees = parseFloat(dmsParts[0]);
         const minutes = parseFloat(dmsParts[1]);
-        const seconds = parseFloat(dmsParts[2]);
+        // Pokud sekundy chybí (např. "48°37'"), dmsParts[2] bude ""
+        // parseFloat("") je NaN, což způsobilo chybu.
+        const seconds = (dmsParts.length > 2 && dmsParts[2]) ? parseFloat(dmsParts[2]) : 0.0;
         
         if (isNaN(degrees) || isNaN(minutes) || isNaN(seconds)) {
             console.warn(`parseDmsWithSymbols: Chyba při parsování čísel: ${part}`);
-            return null;
+            return null; // Vrátíme null, ne [NaN, NaN]
         }
         
         return degrees + minutes / 60 + seconds / 3600;
